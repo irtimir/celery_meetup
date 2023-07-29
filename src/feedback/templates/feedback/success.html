@@ -1,0 +1,10 @@
+{% extends 'feedback/base.html' %}
+
+{% block content %}
+
+<h1>Thank You!</h1>
+
+<p>Your review has been sent.</p>
+<p>If there is a desire, we are ready to <a href="{% url 'feedback:feedback' %}">listen more</a>.</p>
+
+{% endblock content %}
