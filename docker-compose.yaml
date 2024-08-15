@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-default: &default
   restart: unless-stopped
   networks:
@@ -33,7 +31,7 @@ x-celery-worker-default: &celery-worker-default
 services:
   postgres:
     <<: *default
-    image: postgres:13
+    image: postgres:16
     ports:
       - "5432:5432"
     volumes:
@@ -51,38 +49,45 @@ services:
       <<: *hc-interval
       test: [ "CMD-SHELL", "redis-cli", "ping" ]
 
+  init_backend:
+    << : [*default, *py-build]
+    restart: on-failure:5
+    command: ["python", "manage.py", "migrate"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   backend:
     << : [*default, *py-build]
     ports:
       - "8000:8000"
-    entrypoint: [ "bash", "/entrypoint.sh" ]
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
     healthcheck:
       <<: *hc-interval
       test: [ "CMD-SHELL", "curl --fail http://localhost:8000/healthcheck/ || exit 1" ]
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      init_backend:
+        condition: service_completed_successfully
 
   celery_default:
     <<: *celery-worker-default
-    command: [ "python", "-m", "celery", "-A", "django_celery", "worker", "-Q", "default", "-l", "info" ]
+    command: [ "python", "-m", "celery", "-A", "config", "worker", "-Q", "default", "-l", "info" ]
 
   celery_mass_email_send:
     <<: *celery-worker-default
-    command: [ "python", "-m", "celery", "-A", "django_celery", "worker", "-Q", "mass_send_email", "--concurrency", "2", "-l", "info" ]
+    command: [ "python", "-m", "celery", "-A", "config", "worker", "-Q", "mass_send_email", "--concurrency", "2", "-l", "info" ]
 
   celery_beat:
     <<: *celery-default
-    command: [ "python", "-m", "celery", "-A", "django_celery", "beat" ]
+    command: [ "python", "-m", "celery", "-A", "config", "beat" ]
 
   celery_flower:
     <<: *celery-default
     ports:
       - "5555:5555"
-    command: [ "python", "-m", "celery", "-A", "django_celery", "flower" ]
+    command: [ "python", "-m", "celery", "-A", "config", "flower" ]
     healthcheck:
       <<: *hc-interval
       test: [ "CMD-SHELL", "curl --fail http://localhost:5555/metrics || exit 1" ]
