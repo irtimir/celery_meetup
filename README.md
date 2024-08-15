@@ -2,6 +2,12 @@
 
 ## Get started
 
+### Init env variables
+
+```shell
+cp .env.example .env
+```
+
 ### Start containers
 
 ```shell
